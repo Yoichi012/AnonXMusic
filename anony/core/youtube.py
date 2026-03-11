@@ -104,11 +104,17 @@ class YouTube:
 
     async def download(self, video_id: str, video: bool = False) -> str | None:
         url = self.base + video_id
-        ext = "mp4" if video else "webm"
-        filename = f"downloads/{video_id}.{ext}"
 
-        if Path(filename).exists():
-            return filename
+        # Check if file already downloaded (any known audio ext)
+        if video:
+            existing = Path(f"downloads/{video_id}.mp4")
+            if existing.exists():
+                return str(existing)
+        else:
+            for ext in ["webm", "m4a", "opus", "ogg", "mp3"]:
+                existing = Path(f"downloads/{video_id}.{ext}")
+                if existing.exists():
+                    return str(existing)
 
         cookie = self.get_cookies()
         base_opts = {
@@ -131,16 +137,24 @@ class YouTube:
         else:
             ydl_opts = {
                 **base_opts,
-                # FIX: Added fallback formats
                 "format": "bestaudio[ext=webm][acodec=opus]/bestaudio[ext=m4a]/bestaudio/best",
             }
 
         def _download():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 try:
-                    ydl.download([url])
+                    info = ydl.extract_info(url, download=True)
+                    # Get actual downloaded file extension from yt-dlp info
+                    actual_ext = info.get("ext", "mp4" if video else "webm")
+                    actual_file = f"downloads/{video_id}.{actual_ext}"
+                    if Path(actual_file).exists():
+                        return actual_file
+                    # Fallback: scan downloads folder for matching video_id
+                    for f in os.listdir("downloads"):
+                        if f.startswith(video_id):
+                            return f"downloads/{f}"
+                    return None
                 except (yt_dlp.utils.DownloadError, yt_dlp.utils.ExtractorError) as e:
-                    # FIX: Only remove cookie on auth errors, not format errors
                     err = str(e).lower()
                     if cookie and ("sign in" in err or "cookies" in err or "bot" in err):
                         if cookie in self.cookies:
@@ -150,6 +164,5 @@ class YouTube:
                 except Exception as ex:
                     logger.warning("Download failed: %s", ex)
                     return None
-            return filename
 
         return await asyncio.to_thread(_download)
