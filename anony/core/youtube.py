@@ -129,10 +129,10 @@ class YouTube:
             "nocheckcertificate": True,
             "cookiefile": cookie,
             "check_formats": False,
+            "remote_components": ["ejs:github"],
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android", "ios", "web"],
-                    "skip": ["hls", "dash"],
+                    "player_client": ["mweb"],
                 }
             },
         }
@@ -140,18 +140,16 @@ class YouTube:
         if video:
             ydl_opts = {
                 **base_opts,
-                "format": "bestvideo+bestaudio/best",
+                "format": (
+                    "bestvideo[height<=?720][ext=mp4]+bestaudio[ext=m4a]/"
+                    "bestvideo[height<=?720]+bestaudio/18"
+                ),
                 "merge_output_format": "mp4",
             }
         else:
             ydl_opts = {
                 **base_opts,
-                "format": "bestaudio/best",
-                "postprocessors": [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "opus",
-                    "preferredquality": "128",
-                }],
+                "format": "251/250/249/140/bestaudio/best",
             }
 
         def _download():
