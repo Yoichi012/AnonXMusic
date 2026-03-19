@@ -2,14 +2,14 @@
 # Licensed under the MIT License.
 # This file is part of AnonXMusic
 
-
-from pathlib import Path
-
 from pyrogram import filters, types
 
-from anony import anon, app, config, db, lang, queue, tg, yt
+from anony import anon, app, config, db, lang, queue, tg
+from anony.engines.router import SmartRouter
 from anony.helpers import buttons, utils
 from anony.helpers._play import checkUB
+
+router = SmartRouter()
 
 
 def playlist_to_queue(chat_id: int, tracks: list) -> str:
@@ -19,6 +19,7 @@ def playlist_to_queue(chat_id: int, tracks: list) -> str:
         text += f"<b>{pos}.</b> {track.title}\n"
     text = text[:1948] + "</blockquote>"
     return text
+
 
 @app.on_message(
     filters.command(["play", "playforce", "vplay", "vplayforce"])
@@ -36,98 +37,89 @@ async def play_hndlr(
     url: str = None,
 ) -> None:
     sent = await m.reply_text(m.lang["play_searching"])
-    file = None
     mention = m.from_user.mention
-    media = tg.get_media(m.reply_to_message) if m.reply_to_message else None
-    tracks = []
 
+    # Case 1: Telegram file reply
+    media = tg.get_media(m.reply_to_message) if m.reply_to_message else None
     if media:
         setattr(sent, "lang", m.lang)
         file = await tg.download(m.reply_to_message, sent)
-
-    elif m3u8:
-        file = await tg.process_m3u8(url, sent.id, video)
-
-    elif url:
-        if "playlist" in url:
-            await sent.edit_text(m.lang["playlist_fetch"])
-            tracks = await yt.playlist(
-                config.PLAYLIST_LIMIT, mention, url, video
-            )
-
-            if not tracks:
-                return await sent.edit_text(m.lang["playlist_error"])
-
-            file = tracks[0]
-            tracks.remove(file)
-            file.message_id = sent.id
+        if not file:
+            return
+        file.user = mention
+        if force:
+            queue.force_add(m.chat.id, file)
         else:
-            file = await yt.search(url, sent.id, video=video)
+            position = queue.add(m.chat.id, file)
+            if position != 0 or await db.get_call(m.chat.id):
+                return await sent.edit_text(
+                    m.lang["play_queued"].format(
+                        position, file.url or "", file.title, file.duration, mention
+                    )
+                )
+        await anon.play_media(chat_id=m.chat.id, message=sent, media=file)
+        return
 
-        if not file:
-            return await sent.edit_text(
-                m.lang["play_not_found"].format(config.SUPPORT_CHAT)
-            )
+    # Case 2: M3U8 direct stream
+    if m3u8 and url:
+        file = await tg.process_m3u8(url, sent.id, video)
+        file.user = mention
+        if force:
+            queue.force_add(m.chat.id, file)
+        else:
+            position = queue.add(m.chat.id, file)
+            if position != 0 or await db.get_call(m.chat.id):
+                return await sent.edit_text(
+                    m.lang["play_queued"].format(
+                        position, file.url or "", file.title, file.duration, mention
+                    )
+                )
+        await anon.play_media(chat_id=m.chat.id, message=sent, media=file)
+        return
 
-    elif len(m.command) >= 2:
-        query = " ".join(m.command[1:])
-        file = await yt.search(query, sent.id, video=video)
-        if not file:
-            return await sent.edit_text(
-                m.lang["play_not_found"].format(config.SUPPORT_CHAT)
-            )
-
-    if not file:
+    # Case 3: Smart Router (text or URL)
+    query = url if url else (
+        " ".join(m.command[1:]) if len(m.command) >= 2 else None
+    )
+    if not query:
         return await sent.edit_text(m.lang["play_usage"])
 
-    if file.duration_sec > config.DURATION_LIMIT:
+    track = await router.resolve(
+        query=query,
+        video=video,
+        message_id=sent.id,
+        requested_by=mention,
+        chat_id=m.chat.id,
+    )
+
+    if not track:
+        return await sent.edit_text(
+            m.lang["play_not_found"].format(config.SUPPORT_CHAT)
+        )
+
+    if track.duration_sec and track.duration_sec > config.DURATION_LIMIT:
         return await sent.edit_text(
             m.lang["play_duration_limit"].format(config.DURATION_LIMIT // 60)
         )
 
     if await db.is_logger():
-        await utils.play_log(m, sent.link, file.title, file.duration)
+        await utils.play_log(m, sent.link, track.title, track.duration)
 
-    file.user = mention
+    track.user = mention
+
     if force:
-        queue.force_add(m.chat.id, file)
+        queue.force_add(m.chat.id, track)
     else:
-        position = queue.add(m.chat.id, file)
-
+        position = queue.add(m.chat.id, track)
         if position != 0 or await db.get_call(m.chat.id):
             await sent.edit_text(
                 m.lang["play_queued"].format(
-                    position,
-                    file.url,
-                    file.title,
-                    file.duration,
-                    m.from_user.mention,
+                    position, track.url or "", track.title, track.duration, mention,
                 ),
                 reply_markup=buttons.play_queued(
-                    m.chat.id, file.id, m.lang["play_now"]
+                    m.chat.id, track.id, m.lang["play_now"]
                 ),
             )
-            if tracks:
-                added = playlist_to_queue(m.chat.id, tracks)
-                await app.send_message(
-                    chat_id=m.chat.id,
-                    text=m.lang["playlist_queued"].format(len(tracks)) + added,
-                )
             return
 
-    if not file.file_path:
-        fname = f"downloads/{file.id}.{'mp4' if video else 'webm'}"
-        if Path(fname).exists():
-            file.file_path = fname
-        else:
-            await sent.edit_text(m.lang["play_downloading"])
-            file.file_path = await yt.download(file.id, video=video)
-
-    await anon.play_media(chat_id=m.chat.id, message=sent, media=file)
-    if not tracks:
-        return
-    added = playlist_to_queue(m.chat.id, tracks)
-    await app.send_message(
-        chat_id=m.chat.id,
-        text=m.lang["playlist_queued"].format(len(tracks)) + added,
-    )
+    await anon.play_media(chat_id=m.chat.id, message=sent, media=track)

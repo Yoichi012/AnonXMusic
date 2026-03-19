@@ -2,13 +2,14 @@
 # Licensed under the MIT License.
 # This file is part of AnonXMusic
 
-
 import asyncio
+import re
 
 from pyrogram import enums, errors, types
-
-from anony import app, config, db, logger, queue, yt
+from anony import app, config, db, logger, queue
 from anony.helpers import utils
+
+URL_REGEX = re.compile(r"https?://[^\s]+")
 
 
 def checkUB(play):
@@ -34,9 +35,7 @@ def checkUB(play):
         )
         video = m.command[0][0] == "v" and config.VIDEO_PLAY
         url = utils.get_url(m)
-        if url and yt.invalid(url):
-            return await m.reply_text(m.lang["play_not_found"].format(config.SUPPORT_CHAT))
-        m3u8 = url and not yt.valid(url)
+        m3u8 = url and bool(re.match(r"https?://[^\s]+\.m3u8", url))
 
         play_mode = await db.get_play_mode(chat_id)
         if play_mode or force:
@@ -57,15 +56,11 @@ def checkUB(play):
                     enums.ChatMemberStatus.RESTRICTED,
                 ]:
                     try:
-                        await app.unban_chat_member(
-                            chat_id=chat_id, user_id=client.id
-                        )
+                        await app.unban_chat_member(chat_id=chat_id, user_id=client.id)
                     except Exception:
                         return await m.reply_text(
                             m.lang["play_banned"].format(
-                                app.name,
-                                client.id,
-                                client.mention,
+                                app.name, client.id, client.mention,
                                 f"@{client.username}" if client.username else None,
                             )
                         )
@@ -111,7 +106,6 @@ def checkUB(play):
                     return await umm.edit_text(
                         m.lang["play_invite_error"].format(type(ex).__name__)
                     )
-
                 await umm.delete()
                 await client.resolve_peer(chat_id)
 

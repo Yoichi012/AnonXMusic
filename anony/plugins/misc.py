@@ -2,13 +2,11 @@
 # Licensed under the MIT License.
 # This file is part of AnonXMusic
 
-
 import time
 import asyncio
 
 from pyrogram import enums, errors, filters, types
-
-from anony import anon, app, config, db, lang, queue, tasks, userbot, yt
+from anony import anon, app, config, db, lang, queue, tasks, userbot
 from anony.helpers import buttons
 
 
@@ -23,10 +21,10 @@ async def auto_leave():
         await asyncio.sleep(3600)
         for ub in userbot.clients:
             try:
-                chats = [dialog.chat.id async for dialog in ub.get_dialogs()
-                            if dialog.chat.type in [
-                                enums.ChatType.GROUP, enums.ChatType.SUPERGROUP,
-                            ]][-20:]
+                chats = [
+                    dialog.chat.id async for dialog in ub.get_dialogs()
+                    if dialog.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]
+                ][-20:]
                 for chat in chats:
                     if chat in [app.logger, -1001686672798, -1001549206010]:
                         continue
@@ -67,11 +65,6 @@ async def update_timer(length=10):
                 remaining = duration - played
                 pos = min(int((played / duration) * length), length - 1)
                 timer = "—" * pos + "◉" + "—" * (length - pos - 1)
-
-                if remaining <= 30:
-                    next = queue.get_next(chat_id, check=True)
-                    if next and not next.file_path:
-                        next.file_path = await yt.download(next.id, video=next.video)
 
                 if remaining < 10:
                     remove = True

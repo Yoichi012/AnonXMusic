@@ -2,14 +2,12 @@
 # Licensed under the MIT License.
 # This file is part of AnonXMusic
 
-
 import os
 import sys
 import shutil
 import asyncio
 
 from pyrogram import filters, types
-
 from anony import app, db, lang, stop
 
 
@@ -34,7 +32,6 @@ async def _logger(_, m: types.Message):
         return await m.reply_text(m.lang["logger_usage"].format(m.command[0]))
     if m.command[1] not in ("on", "off"):
         return await m.reply_text(m.lang["logger_usage"].format(m.command[0]))
-
     if m.command[1] == "on":
         await db.set_logger(True)
         await m.reply_text(m.lang["logger_on"])
@@ -47,15 +44,12 @@ async def _logger(_, m: types.Message):
 @lang.language()
 async def _restart(_, m: types.Message):
     sent = await m.reply_text(m.lang["restarting"])
-
-    for directory in ["cache", "downloads"]:
-        shutil.rmtree(directory, ignore_errors=True)
-
+    shutil.rmtree("cache", ignore_errors=True)
     await sent.edit_text(m.lang["restarted"])
     asyncio.create_task(stop())
     await asyncio.sleep(2)
-
-    try: os.remove("log.txt")
-    except Exception: pass
-
+    try:
+        os.remove("log.txt")
+    except Exception:
+        pass
     os.execl(sys.executable, sys.executable, "-m", "anony")

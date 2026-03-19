@@ -2,7 +2,6 @@
 # Licensed under the MIT License.
 # This file is part of AnonXMusic
 
-
 import time
 import asyncio
 import logging
@@ -24,11 +23,9 @@ logging.getLogger("pyrogram").setLevel(logging.ERROR)
 logging.getLogger("pytgcalls").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
-
-__version__ = "3.0.2"
+__version__ = "4.0.0"
 
 from config import Config
-
 config = Config()
 config.check()
 tasks = []
@@ -50,9 +47,7 @@ from anony.core.lang import Language
 lang = Language()
 
 from anony.core.telegram import Telegram
-from anony.core.youtube import YouTube
 tg = Telegram()
-yt = YouTube()
 
 from anony.helpers import Queue, Thumbnail
 queue = Queue()
@@ -70,10 +65,8 @@ async def stop() -> None:
             await task
         except asyncio.exceptions.CancelledError:
             pass
-
     await app.exit()
     await userbot.exit()
     await db.close()
     await thumb.close()
-
     logger.info("Stopped.\n")

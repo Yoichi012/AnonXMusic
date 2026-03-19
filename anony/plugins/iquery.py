@@ -2,11 +2,9 @@
 # Licensed under the MIT License.
 # This file is part of AnonXMusic
 
-
-from py_yt import VideosSearch
+import httpx
 from pyrogram import types
-
-from anony import app
+from anony import app, config
 from anony.helpers import buttons
 
 
@@ -15,39 +13,42 @@ async def inline_query_handler(_, query: types.InlineQuery):
     text = query.query.strip().lower()
     if not text:
         return
-
     try:
-        search = VideosSearch(text, limit=15)
-        results = (await search.next()).get("result", [])
+        async with httpx.AsyncClient(timeout=8) as client:
+            resp = await client.get(
+                f"{config.JIOSAAVN_API_URL}/api/search/songs",
+                params={"query": text, "limit": 15},
+            )
+            resp.raise_for_status()
+            data = resp.json()
 
+        results_data = data.get("data", {}).get("results", [])
         answers = []
-        for video in results:
-            title = video.get("title", "Unknown Title").title()
-            duration = video.get("duration", "N/A")
-            views = video.get("viewCount", {}).get("short", "N/A")
-            thumbnail = video.get("thumbnails", [{}])[0].get("url", "").split("?")[0]
-            channel = video.get("channel", {}).get("name", "Unknown Channel")
-            channellink = video.get("channel", {}).get("link", "https://youtube.com")
-            link = video.get("link", "https://youtube.com")
-            published = video.get("publishedTime", "N/A")
 
-            description = f"{views} | {duration} | {channel} | {published}"
+        for song in results_data:
+            title = song.get("name", "Unknown Title")
+            artists = song.get("artists", {}).get("primary", [])
+            artist_name = artists[0].get("name", "Unknown") if artists else "Unknown"
+            duration_sec = int(song.get("duration", 0))
+            minutes, seconds = divmod(duration_sec, 60)
+            duration_str = f"{minutes}:{seconds:02d}"
+            images = song.get("image", [])
+            thumbnail = images[-1].get("url", "") if images else config.DEFAULT_THUMB
+            page_url = song.get("url", "https://www.jiosaavn.com")
+
             caption = (
-                f"<b>Title:</b> <a href='{link}'>{title[:250]}</a>\n\n"
-                f"<b>Duration:</b> {duration}\n"
-                f"<b>Views:</b> <code>{views}</code>\n"
-                f"<b>Channel:</b> <a href='{channellink}'>{channel}</a>\n"
-                f"<b>Published:</b> {published}\n\n"
+                f"<b>Title:</b> <a href='{page_url}'>{title[:250]}</a>\n\n"
+                f"<b>Duration:</b> {duration_str}\n"
+                f"<b>Artist:</b> {artist_name}\n\n"
                 f"<u><i>Fetched by {app.name}</i></u>"
             )
-
             answers.append(
                 types.InlineQueryResultPhoto(
                     photo_url=thumbnail,
                     title=title,
-                    description=description,
+                    description=f"{artist_name} | {duration_str}",
                     caption=caption,
-                    reply_markup=buttons.yt_key(link),
+                    reply_markup=buttons.yt_key(page_url),
                 )
             )
 

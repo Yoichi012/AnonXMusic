@@ -2,7 +2,6 @@
 # Licensed under the MIT License.
 # This file is part of AnonXMusic
 
-
 from dataclasses import dataclass
 
 
@@ -11,7 +10,7 @@ class Media:
     id: str
     duration: str = "00:00"
     duration_sec: int = 0
-    file_path: str = None
+    stream_url: str = None
     message_id: int = 0
     title: str = None
     url: str = None
@@ -28,7 +27,7 @@ class Track:
     duration_sec: int = 0
     title: str = None
     url: str = None
-    file_path: str = None
+    stream_url: str = None
     message_id: int = 0
     time: int = 0
     thumbnail: str = None

@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  cobalt-api:
+    image: ghcr.io/imputnet/cobalt:10
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9000:9000"
+    environment:
+      API_URL: "http://127.0.0.1:9000"
+      CORS_WILDCARD: "0"
