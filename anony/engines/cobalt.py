@@ -27,12 +27,15 @@ YT_ID_REGEX = re.compile(
 
 class Cobalt:
     def __init__(self):
-        self.api_url = f"{config.COBALT_URL}/"
+        self.api_url = f"{config.COBALT_URL}/api/json"
         self.client = httpx.AsyncClient(timeout=20)
 
     async def get_stream_url(self, url: str, is_audio_only: bool = True) -> str:
         payload = {
             "url": url,
+            "isAudioOnly": is_audio_only,
+            "aFormat": "mp3",
+            "audioQuality": "320",
         }
         try:
             resp = await self.client.post(
