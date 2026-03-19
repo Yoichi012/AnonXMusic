@@ -128,35 +128,30 @@ class YouTube:
             "overwrites": False,
             "nocheckcertificate": True,
             "cookiefile": cookie,
-            "format_sort": ["abr", "asr", "br"],
+            "check_formats": False,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "ios", "web"],
+                    "skip": ["hls", "dash"],
+                }
+            },
         }
 
         if video:
             ydl_opts = {
                 **base_opts,
-                "format": (
-                    "bestvideo[height<=?720][ext=mp4]+bestaudio[ext=m4a]/"
-                    "bestvideo[height<=?720]+bestaudio/best[height<=?720]/best"
-                ),
+                "format": "bestvideo+bestaudio/best",
                 "merge_output_format": "mp4",
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["android", "ios", "web"],
-                    }
-                },
             }
         else:
             ydl_opts = {
                 **base_opts,
-                "format": (
-                    "bestaudio[ext=webm]/bestaudio[ext=m4a]/"
-                    "bestaudio[ext=opus]/bestaudio/best"
-                ),
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["android", "ios", "web"],
-                    }
-                },
+                "format": "bestaudio/best",
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "opus",
+                    "preferredquality": "128",
+                }],
             }
 
         def _download():
