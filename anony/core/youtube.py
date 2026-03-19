@@ -6,7 +6,6 @@
 import os
 import re
 import yt_dlp
-import random
 import asyncio
 import aiohttp
 from pathlib import Path
@@ -24,7 +23,8 @@ class _YTLogger:
     def warning(self, msg):
         skip_keywords = [
             "jsc", "0.7.0", "challenge", "PO Token",
-            "po_token", "GVS", "n challenge", "skipping"
+            "po_token", "GVS", "n challenge", "skipping",
+            "No title found"
         ]
         if not any(k.lower() in msg.lower() for k in skip_keywords):
             logger.warning(msg)
@@ -120,7 +120,7 @@ class YouTube:
             "check_formats": False,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["mweb"],
+                    "player_client": ["web"],
                 }
             },
         }
